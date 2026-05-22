@@ -1,0 +1,42 @@
+name: Deploy Astro Worker (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js major version
+        type: string
+        default: '22'
+      build-command:
+        description: npm script to run for build
+        type: string
+        default: 'build'
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run ${{ inputs.build-command }}
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
