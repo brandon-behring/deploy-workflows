@@ -23,11 +23,27 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  deployments: write
+  actions: read
+
 jobs:
   deploy:
     uses: brandon-behring/deploy-workflows/.github/workflows/deploy-astro-worker.yml@main
     secrets: inherit
 ```
+
+> **Why the explicit `permissions:` block?** The reusable workflow declares
+> its own `permissions:` minimums (`contents: read`, `deployments: write`).
+> When the caller omits a `permissions:` block, GitHub uses the repository's
+> default `GITHUB_TOKEN` permissions, which on newer repos can be too narrow
+> to satisfy the reusable workflow's declared needs — producing a
+> `startup_failure` with the unhelpful message *"This run likely failed
+> because of a workflow file issue."* Declaring the three permissions above
+> in the caller fixes it. `actions: read` covers cross-repo reusable-workflow
+> resolution; `contents: read` covers the checkout; `deployments: write`
+> covers the GitHub Deployments API surface the reusable workflow uses.
 
 The consuming repo must have:
 
