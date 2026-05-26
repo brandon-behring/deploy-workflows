@@ -129,12 +129,17 @@ this reusable workflow:
   programmatically (eliminates the dashboard click; idempotent).
 - `worker-name` input override.
 
-### Optional GitHub Organization
+### ~~Optional GitHub Organization~~ (considered and skipped)
 
-Create a personal org (e.g., `brandon-behring-org`), transfer deploy repos,
-store `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` as org secrets.
-After that, new sibling sites need zero per-repo secret setup. The single
-highest-leverage simplification once you have 3+ consuming sites.
+Previously suggested as the way to share secrets across repos. On second
+look the cost (URL churn on every repo, redirect-but-not-canonical
+breakage of external references, irreversible-ish org naming) outweighs
+the benefit (~2 minutes of `gh secret set` saved over the project
+lifetime) for a solo developer. Most successful solo developers
+(simonw, karpathy, antirez, antirez) keep everything under their
+personal account. Instead, use the `scripts/setup-cf-secrets.sh`
+helper documented below — it captures the secret-management convenience
+without the org overhead.
 
 ### Optional template repo
 
@@ -142,8 +147,39 @@ Create `brandon-behring/astro-cf-template` with pre-wired `wrangler.jsonc`,
 caller workflow, `package.json` skeleton. "Use this template" → ready-to-
 deploy new site.
 
+### Future: migrate to OIDC
+
+When [cloudflare/wrangler-action#402](https://github.com/cloudflare/wrangler-action/issues/402)
+ships OIDC auth support, this reusable workflow should be updated to
+request a short-lived Cloudflare token via OIDC instead of consuming the
+`CLOUDFLARE_API_TOKEN` secret. No long-lived secret stored anywhere; one
+trust relationship configured once in CF dashboard. Bump to `@v3` when
+that lands; consumers upgrade and drop the secret.
+
 ## Secrets setup (for new consumer repos)
 
-See `brandon-behring/brandon-behring.dev/docs/cloudflare-setup.md` for the
-walkthrough: get Account ID, create an "Edit Cloudflare Workers" API token,
-run `gh secret set` for `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+Two options:
+
+**Manual (one-shot):** see `brandon-behring/brandon-behring.dev/docs/cloudflare-setup.md`
+for the walkthrough: get Account ID, create an "Edit Cloudflare Workers" API
+token, run `gh secret set` for `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+
+**Helper (scriptable, recommended for multi-repo work):** use the included
+`scripts/setup-cf-secrets.sh`:
+
+```bash
+./scripts/setup-cf-secrets.sh brandon-behring/<repo>
+```
+
+The helper reads `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from
+`~/.config/brandon-cf-secrets.env` (override with `BRANDON_CF_SECRETS_PATH=...`)
+and runs `gh secret set` for both. Idempotent — safe to re-run.
+
+Create `~/.config/brandon-cf-secrets.env` once (mode 600 recommended):
+
+```
+CLOUDFLARE_API_TOKEN=<your-token>
+CLOUDFLARE_ACCOUNT_ID=<your-account-id>
+```
+
+Then setting up a new consumer repo is one command.
