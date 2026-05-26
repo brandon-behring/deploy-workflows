@@ -40,6 +40,19 @@ source "$SECRETS_PATH"
 : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN not set in $SECRETS_PATH}"
 : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID not set in $SECRETS_PATH}"
 
+# Refuse to run if either value is still a placeholder (avoids pushing
+# bogus secrets to GitHub when the template was created but not filled in).
+if [[ "$CLOUDFLARE_API_TOKEN" == FILL_IN_* ]]; then
+  echo "Error: CLOUDFLARE_API_TOKEN is still a placeholder (starts with FILL_IN_)." >&2
+  echo "Edit $SECRETS_PATH and replace the placeholder with your real token." >&2
+  exit 1
+fi
+if [[ "$CLOUDFLARE_ACCOUNT_ID" == FILL_IN_* ]]; then
+  echo "Error: CLOUDFLARE_ACCOUNT_ID is still a placeholder (starts with FILL_IN_)." >&2
+  echo "Edit $SECRETS_PATH and replace the placeholder with your real Account ID." >&2
+  exit 1
+fi
+
 echo "Setting CF secrets on $REPO..."
 gh secret set CLOUDFLARE_API_TOKEN  --repo "$REPO" --body "$CLOUDFLARE_API_TOKEN"
 gh secret set CLOUDFLARE_ACCOUNT_ID --repo "$REPO" --body "$CLOUDFLARE_ACCOUNT_ID"
