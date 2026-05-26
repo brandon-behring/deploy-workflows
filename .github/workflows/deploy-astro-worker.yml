@@ -11,6 +11,21 @@ on:
         description: npm script to run for build
         type: string
         default: 'build'
+      working-directory:
+        description: |
+          Subdirectory of the repo that contains package.json + the wrangler config.
+          Defaults to '.' (repo root). Set to e.g. 'web' or 'guides/web' for monorepos
+          where the Astro consumer lives in a subdirectory.
+        type: string
+        default: '.'
+      validate-command:
+        description: |
+          Optional npm script to run between `npm ci` and the build, as a
+          schema/contract gate. Empty (default) skips it. Set to e.g. 'validate'
+          for academic books using `book-scaffold validate` so a broken cite key
+          or duplicate anchor ID fails CI before the build runs.
+        type: string
+        default: ''
     secrets:
       CLOUDFLARE_API_TOKEN:
         required: true
@@ -24,6 +39,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,12 +49,18 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
 
       - run: npm ci
+
+      - if: inputs.validate-command != ''
+        run: npm run ${{ inputs.validate-command }}
+
       - run: npm run ${{ inputs.build-command }}
 
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ${{ inputs.working-directory }}
           command: deploy
