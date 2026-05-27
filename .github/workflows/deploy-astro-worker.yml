@@ -36,6 +36,13 @@ permissions:
   contents: read
   deployments: write
 
+env:
+  # Opt JavaScript actions into Node 24 ahead of the 2026-06-02 forced switch.
+  # Silences the Node 20 deprecation annotation on actions/checkout@v4,
+  # actions/setup-node@v4, and cloudflare/wrangler-action@v3 until their
+  # next major releases ship native Node 24 support.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
