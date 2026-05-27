@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   deploy:
-    uses: brandon-behring/deploy-workflows/.github/workflows/deploy-astro-worker.yml@main
+    uses: brandon-behring/deploy-workflows/.github/workflows/deploy-astro-worker.yml@v1
     secrets: inherit
 ```
 
@@ -71,19 +71,88 @@ The consuming repo must have:
 |---|---|---|---|
 | `node-version` | string | `'22'` | Node major version for `actions/setup-node@v4` |
 | `build-command` | string | `'build'` | npm script name to run for the build step |
+| `working-directory` | string | `'.'` | Subdirectory containing `package.json` + wrangler config (monorepo support; e.g. `'web'`) |
+| `validate-command` | string | `''` | Optional npm script run between `npm ci` and build (e.g. `'validate'` for book-scaffold cite-key checks). Empty = skipped |
+| `apt-packages` ★ v2 | string | `''` | Space-separated apt packages installed via `apt-get -y` before `npm ci`. Empty = skipped. Example: `'pandoc texlive-base pdf2svg'` |
+| `enable-pr-previews` ★ v2 | boolean | `false` | When true, adds a `pull_request` job that runs `wrangler versions upload` and posts the preview URL as a PR comment. Caller must declare `pull_request:` trigger + `pull-requests: write` permission |
 
 Book sites whose build needs extra steps should rely on npm `prebuild` hooks
 in their own `package.json` rather than overriding `build-command` here.
 That keeps the workflow simple and the build logic per-repo.
 
-## Versioning
+### apt-packages (v2)
 
-Currently consumed via `@main`. Once a 2nd consumer repo exists, switch to
-tag pins (`@v1`) so a breaking change here cannot silently break every
-site:
+For sites that need system binaries during the build (pandoc, LaTeX,
+poppler tools, etc.). Skipped when empty. Runs in both the production
+and preview jobs.
+
+dlai-style caller using apt-packages:
 
 ```yaml
-uses: brandon-behring/deploy-workflows/.github/workflows/deploy-astro-worker.yml@v1
+jobs:
+  deploy:
+    uses: brandon-behring/deploy-workflows/.github/workflows/deploy-astro-worker.yml@v2
+    secrets: inherit
+    with:
+      apt-packages: "pandoc texlive-base texlive-latex-extra texlive-pictures pdf2svg poppler-utils"
+      validate-command: validate
+```
+
+### enable-pr-previews (v2)
+
+Extracts the `double_ml_time_series` preview-on-PR pattern as an opt-in.
+When true, opens PRs trigger a `wrangler versions upload` (not deploy)
+and a bot comment with the preview URL. Worker versions accumulate;
+clean them manually via the CF dashboard if they pile up.
+
+DML-style caller using enable-pr-previews:
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  deployments: write
+  actions: read
+  pull-requests: write   # required when enable-pr-previews: true
+
+jobs:
+  deploy:
+    uses: brandon-behring/deploy-workflows/.github/workflows/deploy-astro-worker.yml@v2
+    secrets: inherit
+    with:
+      working-directory: web
+      validate-command: ci:validate
+      enable-pr-previews: true
+```
+
+## Versioning
+
+Use tag pins, not `@main`:
+
+- **`@v1`** — current stable (Phase 1d, 2026-05-26). All 3 portfolio
+  consumers (`brandon-behring.dev`, `double_ml_time_series`,
+  `ssm-foundations`) pin here. Currently at `v1.0.1` (Node 24 opt-in
+  patch). Force-moveable on patch releases.
+- **`@v1.0.0`** / **`@v1.0.1`** — immutable point-in-time pins; use only
+  if you specifically need to bisect or freeze.
+- **`@v2`** — adds `apt-packages` + `enable-pr-previews`. Future
+  consumers (dlai, post_transformers, etc.) start here.
+- **`@v2.0.0`** — immutable point-in-time pin.
+
+Convention follows `actions/checkout@v4` / `cloudflare/wrangler-action@v3`:
+moveable major-line floating tag + immutable semver tags for the same
+commits. Patches that fix bugs (e.g., `v1.0.1`) force-move `v1` so all
+v1 consumers auto-pick-up on next CI.
+
+```yaml
+uses: brandon-behring/deploy-workflows/.github/workflows/deploy-astro-worker.yml@v2
 ```
 
 ## First consumer

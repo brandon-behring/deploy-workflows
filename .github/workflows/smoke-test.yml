@@ -1,0 +1,35 @@
+name: Smoke test
+
+# Self-contained smoke test for the reusable workflow's environment
+# assumptions. Runs on push to main when the reusable workflow OR this
+# smoke test itself changes. Catches obvious breaks in the apt-install
+# path (introduced in v2) before they ship downstream to dlai/DML.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy-astro-worker.yml'
+      - '.github/workflows/smoke-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  apt-packages-smoke:
+    name: apt-packages install syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install a tiny apt package (smoke test)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tree
+
+      - name: Verify the package landed on PATH
+        run: |
+          which tree
+          tree --version
