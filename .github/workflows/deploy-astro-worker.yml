@@ -52,6 +52,7 @@ on:
 permissions:
   contents: read
   deployments: write
+  pull-requests: write   # enable-pr-previews: the "Comment preview URL on PR" step posts via issues.createComment
 
 jobs:
   deploy-production:
